@@ -1,0 +1,142 @@
+-- ====================================================
+-- Анализ возвратов и оттока клиентов
+-- Задача: определение групп возвратов (30/60/90 дней) для анализа LTV и удержания
+-- ====================================================
+
+-- 1. Базовый слой заказов: вычисляем дату предыдущего заказа для каждого клиента
+WITH orders AS (
+    SELECT
+        oh.user_phone AS user_mobile,           -- обезличенный номер
+        oh.order_id,
+        oh.customer_id, 
+        oh.store_id, 
+        CAST(oh.created_at AS DATE) AS order_date,
+        oh.created_at,
+        oh.order_source,
+        oh.paid_amount,
+        -- Получаем дату предыдущего заказа
+        LAG(CAST(oh.created_at AS DATE)) OVER (
+            PARTITION BY oh.user_phone ORDER BY oh.created_at
+        ) AS prev_order_date
+    FROM schema_orders.orders_table oh
+),
+
+-- 2. Флаги возврата: был ли заказ в интервалах 30/60/90 дней после предыдущего
+flags AS (
+    SELECT 
+        o.*,
+        CASE 
+            WHEN prev_order_date IS NULL THEN 0
+            WHEN order_date > prev_order_date + INTERVAL '30 day' THEN 1
+            ELSE 0
+        END AS is_return_30,   -- возврат через 30+ дней = перерыв
+        CASE 
+            WHEN prev_order_date IS NULL THEN 0
+            WHEN order_date > prev_order_date + INTERVAL '60 day' THEN 1
+            ELSE 0
+        END AS is_return_60,
+        CASE 
+            WHEN prev_order_date IS NULL THEN 0
+            WHEN order_date > prev_order_date + INTERVAL '90 day' THEN 1
+            ELSE 0
+        END AS is_return_90
+    FROM orders o
+),
+
+-- 3. Группы возвратов: кумулятивная сумма флагов = номер группы лояльности
+groups AS (
+    SELECT
+        f.*,
+        -- Номер группы возврата (каждый перерыв >30 дней увеличивает группу)
+        SUM(f.is_return_30) OVER (
+            PARTITION BY f.user_mobile 
+            ORDER BY f.order_date 
+            ROWS BETWEEN UNBOUNDED PRECEDING AND CURRENT ROW
+        ) AS return_group_30,
+        SUM(f.is_return_60) OVER (
+            PARTITION BY f.user_mobile 
+            ORDER BY f.order_date 
+            ROWS BETWEEN UNBOUNDED PRECEDING AND CURRENT ROW
+        ) AS return_group_60,
+        SUM(f.is_return_90) OVER (
+            PARTITION BY f.user_mobile 
+            ORDER BY f.order_date 
+            ROWS BETWEEN UNBOUNDED PRECEDING AND CURRENT ROW
+        ) AS return_group_90
+    FROM flags f
+)
+
+-- 4. Итоговая выборка: агрегация по дням, сегментам, каналам
+SELECT
+    CAST(g.created_at AS DATE) AS event_date,
+    CASE
+         WHEN seg.customer_segment IS NOT NULL THEN seg.customer_segment
+         ELSE 'unknown'
+    END AS customer_segment,
+    g.user_mobile,
+    city.city_name,
+    COALESCE(tracker.partner_name, 'Organic') AS affiliate_partner,  -- партнёр/подрядчик
+    attr.network_name,
+    attr.campaign_name, 
+    g.order_source,
+    COUNT(DISTINCT g.order_id) AS total_orders,
+    SUM(g.paid_amount) AS total_revenue,
+    -- Флаги оттока для фильтрации (1 = клиент когда-либо уходил в отток)
+    MAX(CASE WHEN g.return_group_30 > 0 THEN 1 ELSE 0 END) AS is_churned_30,
+    MAX(CASE WHEN g.return_group_60 > 0 THEN 1 ELSE 0 END) AS is_churned_60,
+    MAX(CASE WHEN g.return_group_90 > 0 THEN 1 ELSE 0 END) AS is_churned_90
+FROM groups g
+
+-- 5. Привязка атрибуции (данные из mobile measurement partner)
+LEFT JOIN (
+    SELECT DISTINCT ON (transaction_id)
+           transaction_id,
+           network_name,
+           campaign_name
+    FROM schema_attribution.mmp_events
+    WHERE event_name = 'Purchase'
+          AND CAST(TO_TIMESTAMP(created_at::NUMERIC) AS DATE) >= DATE_TRUNC('month', CURRENT_DATE - INTERVAL '3 month')::DATE
+          AND CAST(TO_TIMESTAMP(created_at::NUMERIC) AS DATE) < CURRENT_DATE
+) attr
+    ON g.order_id = attr.transaction_id
+
+-- 6. Справочник партнёров/подрядчиков (affiliate network)
+LEFT JOIN schema_reference.affiliate_partners tracker 
+    ON tracker.partner_id = attr.network_name
+
+-- 7. Справочник магазинов/точек
+LEFT JOIN schema_dim.stores store 
+       ON store.store_id = g.store_id 
+       AND store.valid_to = '5999-01-01' 
+       AND store.is_deleted = 0
+
+-- 8. Справочник городов
+LEFT JOIN schema_reference.cities city 
+       ON store.city_id = city.city_id
+
+-- 9. Справочник клиентов (демография)
+LEFT JOIN schema_dim.customers cust 
+       ON g.customer_id = cust.customer_id 
+       AND cust.valid_to = DATE '5999-01-01' 
+
+-- 10. Сегменты клиентов (RFM, поведенческие)
+LEFT JOIN schema_marts.customer_segments seg 
+       ON cust.customer_id = seg.customer_id
+       AND seg.report_date >= DATE_TRUNC('month', CURRENT_DATE)
+
+WHERE 
+    -- Фильтр: последний месяц данных
+    g.created_at::DATE >= DATE_TRUNC('month', CURRENT_DATE - INTERVAL '1 month')::DATE
+    AND g.created_at::DATE < CURRENT_DATE
+    -- Фильтр по источнику заказов (основное приложение/сайт)
+    AND g.order_source LIKE '%APP%'
+
+GROUP BY 
+    tracker.partner_name,
+    attr.campaign_name,
+    seg.customer_segment,
+    attr.network_name, 
+    CAST(g.created_at AS DATE), 
+    g.user_mobile,
+    city.city_name,
+    g.order_source;
