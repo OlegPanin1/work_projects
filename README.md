@@ -7,10 +7,12 @@
 - **A/B тест моделей атрибуции** — сравнение last click vs multi-touch, статистическая значимость (бутстрап), экономический эффект (CPA, ROMI), разрез по каналам
 - **Когортный анализ retention и LTV** — оценка удержания, кумулятивный LTV по когортам, сравнение каналов привлечения, тепловая карта retention
 - **SQL-аналитика (affiliate / e-commerce)** — боевые запросы: анализ возвратов и оттока, юнит-экономика (LTV/CAC/ROMI), воронки, атрибуция, оконные функции
+- **Performance Marketing Dashboard** — финансовая модель по 5 странам: P&L, cash-flow на 60 дней, сценарный анализ рисков; интерактивный HTML-дашборд + Power BI отчёт
+- **EGE Prediction Pipeline** — AutoML-пайплайн прогноза баллов ЕГЭ по пробным экзаменам, запускается в Google Colab, на выходе Excel + PowerPoint для руководства
 
 ## Стек
 
 - Python: pandas, numpy, scipy, matplotlib, seaborn, plotly
 - SQL: PostgreSQL, оконные функции, CTE
-- BI: Power BI, Looker Studio, Grafana
+- BI: Power BI
 - Статистика: A/B тестирование, бутстрап, доверительные интервалы
