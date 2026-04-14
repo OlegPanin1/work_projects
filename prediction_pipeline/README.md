@@ -2,7 +2,6 @@
 
 > ML-пайплайн для прогнозирования баллов ЕГЭ на основе результатов пробных экзаменов. Запускается в один клик в Google Colab — без установки, без настройки.
 
-[![Open In Colab](https://colab.research.google.com/assets/colab-badge.svg)]([https://colab.research.google.com/github/YOUR_USERNAME/YOUR_REPO/blob/main/prediction_pipeline_v2.ipynb](https://colab.research.google.com/drive/18tfgQ05_W3AQPFD7d6viEc_ir0TjgJBp#scrollTo=jq0QNDtwQ_2h))
 
 ---
 
