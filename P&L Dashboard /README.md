@@ -1,8 +1,5 @@
 # 📊 Performance Marketing — Financial Dashboard
 
-<img width="1909" height="581" alt="image" src="https://github.com/user-attachments/assets/b9760bfa-30b3-46d5-b8b2-11ef911df393" />
-
-
 > Финансовая модель для performance-маркетинговой компании: P&L по странам, Cash-Flow анализ и сценарное моделирование рисков.
 
 ---
@@ -30,7 +27,9 @@
 
 ## 🧮 Финансовая модель
 
-### P&L
+### P&L (HTML-дашборд)
+
+<img width="1909" height="581" alt="image" src="https://github.com/user-attachments/assets/b9760bfa-30b3-46d5-b8b2-11ef911df393" />
 
 | Метрика | Формула |
 |---|---|
@@ -62,6 +61,8 @@
 ---
 
 ## 📈 Power BI Dashboard
+
+<img width="1133" height="736" alt="image" src="https://github.com/user-attachments/assets/897f5048-503f-4f41-a110-6e55df85f5e2" />
 
 **Страниц:** 1 | **Таблиц в модели:** 3 (`countries`, `cashflow`, `summary`)
 
