@@ -1,0 +1,337 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Performance Marketing — Financial Dashboard</title>
+<style>
+* { box-sizing: border-box; margin: 0; padding: 0; }
+body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; background: #f9f9f7; color: #1a1a18; padding: 24px; }
+.tabs { display: flex; gap: 4px; margin-bottom: 20px; flex-wrap: wrap; }
+.tab { padding: 7px 16px; border-radius: 8px; border: 0.5px solid #ccc; font-size: 13px; cursor: pointer; background: #fff; color: #666; font-weight: 400; }
+.tab.active { background: #f0efe8; color: #1a1a18; font-weight: 500; border-color: #999; }
+.panel { display: none; } .panel.active { display: block; }
+.metric-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(130px, 1fr)); gap: 10px; margin-bottom: 20px; }
+.metric { background: #f0efe8; border-radius: 8px; padding: 12px 14px; }
+.metric-label { font-size: 12px; color: #666; margin-bottom: 4px; }
+.metric-value { font-size: 22px; font-weight: 500; color: #1a1a18; }
+.metric-sub { font-size: 11px; color: #999; margin-top: 2px; }
+.section-title { font-size: 13px; font-weight: 500; color: #666; margin-bottom: 10px; text-transform: uppercase; letter-spacing: 0.04em; }
+.chart-wrap { position: relative; width: 100%; margin-bottom: 24px; }
+.country-table { width: 100%; border-collapse: collapse; font-size: 13px; margin-bottom: 24px; }
+.country-table th { text-align: left; padding: 6px 10px; color: #666; font-weight: 500; font-size: 12px; border-bottom: 0.5px solid #ddd; }
+.country-table td { padding: 8px 10px; border-bottom: 0.5px solid #eee; color: #1a1a18; }
+.country-table tr:last-child td { border-bottom: none; }
+.badge { display: inline-block; padding: 2px 8px; border-radius: 8px; font-size: 11px; font-weight: 500; }
+.badge-green { background: #EAF3DE; color: #3B6D11; }
+.badge-amber { background: #FAEEDA; color: #854F0B; }
+.badge-red { background: #FCEBEB; color: #A32D2D; }
+.alert-box { background: #FAEEDA; border: 0.5px solid #EF9F27; border-radius: 8px; padding: 10px 14px; font-size: 13px; color: #633806; margin-bottom: 16px; }
+.alert-box strong { font-weight: 500; }
+.formula-box { background: #fff; border: 0.5px solid #ddd; border-left: 3px solid #378ADD; border-radius: 0 8px 8px 0; padding: 12px 16px; margin-bottom: 20px; font-size: 12px; color: #444; line-height: 1.7; }
+.formula-box strong { font-weight: 500; color: #1a1a18; }
+.formula-row { margin-bottom: 3px; }
+.sc-table { width: 100%; border-collapse: collapse; font-size: 13px; margin-bottom: 24px; }
+.sc-table th { text-align: left; padding: 8px 12px; color: #666; font-weight: 500; font-size: 12px; border-bottom: 1px solid #ddd; background: #f9f9f7; }
+.sc-table td { padding: 10px 12px; border-bottom: 0.5px solid #eee; color: #1a1a18; }
+.sc-table tr:last-child td { border-bottom: none; }
+.positive { color: #3B6D11; font-weight: 500; }
+.negative { color: #A32D2D; font-weight: 500; }
+</style>
+</head>
+<body>
+
+<div style="margin-bottom: 24px;">
+  <h1 style="font-size: 20px; font-weight: 500; margin-bottom: 4px;">Performance Marketing — Financial Dashboard</h1>
+  <p style="font-size: 13px; color: #666;">Финансовая модель · Cash-Flow · Сценарный анализ</p>
+</div>
+
+<div class="tabs">
+  <div class="tab active" onclick="switchTab('pl')">P&L по странам</div>
+  <div class="tab" onclick="switchTab('cf')">Cash-Flow 60 дней</div>
+  <div class="tab" onclick="switchTab('scenario')">Сценарный анализ</div>
+</div>
+
+<!-- P&L -->
+<div id="pl" class="panel active">
+  <div class="formula-box">
+    <div class="formula-row"><strong>Подтверждённые клиенты</strong> = Все клиенты × (1 − % неподтверждённых)</div>
+    <div class="formula-row"><strong>Чистый доход</strong> = Подтверждённые × Доход за клиента</div>
+    <div class="formula-row"><strong>Переменные расходы</strong> = Все клиенты × Opex за клиента &nbsp;(трафик куплен на всех, доход только с подтверждённых)</div>
+    <div class="formula-row"><strong>Валовая прибыль</strong> = Чистый доход − Переменные расходы</div>
+    <div class="formula-row"><strong>Валовая маржа</strong> = Валовая прибыль ÷ Чистый доход</div>
+    <div class="formula-row"><strong>EBITDA</strong> = Валовая прибыль − (Команда + IT + Банк 3.9% от оборота)</div>
+    <div class="formula-row"><strong>Маржа EBITDA</strong> = EBITDA ÷ Чистый доход</div>
+  </div>
+  <div class="metric-grid" id="summary-metrics"></div>
+  <p class="section-title">P&L по странам</p>
+  <table class="country-table" id="pl-table"></table>
+  <p class="section-title">Валовая прибыль и маржа по странам</p>
+  <div class="chart-wrap" style="height:260px;"><canvas id="marginChart"></canvas></div>
+  <div class="chart-wrap" style="height:220px;"><canvas id="revenueChart"></canvas></div>
+</div>
+
+<!-- CASH FLOW -->
+<div id="cf" class="panel">
+  <div class="formula-box">
+    <div class="formula-row"><strong>Дневные расходы</strong> = Переменные расходы за месяц ÷ 30</div>
+    <div class="formula-row"><strong>Поступления с дня 31</strong> = Чистый доход × 70% ÷ 30 &nbsp;(задержка 30 дней)</div>
+    <div class="formula-row"><strong>Поступления с дня 41</strong> = Чистый доход × 30% ÷ 40 &nbsp;(задержка 40 дней)</div>
+    <div class="formula-row"><strong>Баланс каждого дня</strong> = Баланс предыдущего дня − расходы + поступления (если пришли)</div>
+    <div class="formula-row"><strong>Кассовый разрыв</strong> = день когда баланс впервые уходит ниже нуля</div>
+    <div class="formula-row"><strong>Необходимый резерв</strong> = Текущий резерв + |Минимальный баланс|</div>
+  </div>
+  <div class="alert-box" id="cf-alert"></div>
+  <div class="metric-grid" id="cf-metrics"></div>
+  <p class="section-title">Сравнение: базовый vs рост +30%</p>
+  <div class="chart-wrap" style="height:260px;"><canvas id="cfGrowthChart"></canvas></div>
+  <p class="section-title" style="margin-top:16px;">Баланс денежных средств (дни 1–60)</p>
+  <div class="chart-wrap" style="height:260px;"><canvas id="cfChart"></canvas></div>
+</div>
+
+<!-- SCENARIOS -->
+<div id="scenario" class="panel">
+  <div class="formula-box">
+    <div class="formula-row"><strong>Сценарий 1</strong> — % неподтверждённых +5 п.п. по каждой стране → меньше подтверждённых → меньше доход → ниже EBITDA</div>
+    <div class="formula-row"><strong>Сценарий 2</strong> — Opex ×1.10 по каждой стране → выше переменные расходы → ниже валовая прибыль → ниже EBITDA</div>
+    <div class="formula-row"><strong>Сценарий 3</strong> — Доход за клиента ×0.93 → меньше выручка → ниже валовая прибыль и банковская комиссия → ниже EBITDA</div>
+  </div>
+  <p class="section-title">Сводная таблица сценариев</p>
+  <table class="sc-table" id="sc-main-table"></table>
+</div>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.js"></script>
+<script>
+const countries = [
+  { name: 'A', clients: 18000, rev: 52, unconf: 0.10, opex: 39 },
+  { name: 'B', clients: 9500,  rev: 48, unconf: 0.11, opex: 34 },
+  { name: 'C', clients: 6200,  rev: 55, unconf: 0.09, opex: 41 },
+  { name: 'D', clients: 11000, rev: 44, unconf: 0.14, opex: 29 },
+  { name: 'E', clients: 14500, rev: 36, unconf: 0.18, opex: 24 },
+];
+
+const TEAM = 250000, IT = 80000, BANK_RATE = 0.039;
+
+function calcCountry(c) {
+  const confirmed = Math.round(c.clients * (1 - c.unconf));
+  const netRev = confirmed * c.rev;
+  const varCost = c.clients * c.opex;
+  const grossProfit = netRev - varCost;
+  const grossMargin = netRev > 0 ? grossProfit / netRev : 0;
+  return { ...c, confirmed, netRev, varCost, grossProfit, grossMargin };
+}
+
+function calcEBITDA(rows) {
+  const totalRev = rows.reduce((s, r) => s + r.netRev, 0);
+  const totalGross = rows.reduce((s, r) => s + r.grossProfit, 0);
+  const bankFee = totalRev * BANK_RATE;
+  const fixed = TEAM + IT + bankFee;
+  const ebitda = totalGross - fixed;
+  return { totalRev, totalGross, bankFee, fixed, ebitda, margin: ebitda / totalRev };
+}
+
+const base = countries.map(calcCountry);
+const fin = calcEBITDA(base);
+
+function fmt(n) { return (n < 0 ? '-$' : '$') + Math.abs(Math.round(n)).toLocaleString(); }
+function fmtM(n) { return (n < 0 ? '-$' : '$') + Math.abs(n / 1e6).toFixed(2) + 'M'; }
+function pct(n) { return (n * 100).toFixed(1) + '%'; }
+function badgeClass(m) {
+  if (m >= 0.15) return 'badge-green';
+  if (m >= 0.05) return 'badge-amber';
+  return 'badge-red';
+}
+
+// === P&L METRICS ===
+document.getElementById('summary-metrics').innerHTML = `
+  <div class="metric"><div class="metric-label">Чистый доход</div><div class="metric-value">${fmtM(fin.totalRev)}</div><div class="metric-sub">после неподтверждённых</div></div>
+  <div class="metric"><div class="metric-label">Валовая прибыль</div><div class="metric-value">${fmtM(fin.totalGross)}</div><div class="metric-sub">${pct(fin.totalGross/fin.totalRev)} маржа</div></div>
+  <div class="metric"><div class="metric-label">EBITDA</div><div class="metric-value" style="color:${fin.ebitda>0?'#3B6D11':'#A32D2D'}">${fmtM(fin.ebitda)}</div><div class="metric-sub">${pct(fin.margin)} маржа EBITDA</div></div>
+  <div class="metric"><div class="metric-label">Банковские комиссии</div><div class="metric-value">${fmt(fin.bankFee)}</div><div class="metric-sub">3.9% от оборота</div></div>
+  <div class="metric"><div class="metric-label">Фикс. расходы всего</div><div class="metric-value">${fmt(fin.fixed)}</div><div class="metric-sub">команда + IT + банк</div></div>
+`;
+
+// === P&L TABLE ===
+let tableHTML = `<thead><tr>
+  <th>Страна</th><th>Клиенты</th><th>Подтверждённых</th><th>Доход</th><th>Пер. расходы</th><th>Вал. прибыль</th><th>Маржа</th>
+</tr></thead><tbody>`;
+base.forEach(r => {
+  tableHTML += `<tr>
+    <td><strong>${r.name}</strong></td>
+    <td>${r.clients.toLocaleString()}</td>
+    <td>${r.confirmed.toLocaleString()}</td>
+    <td>${fmt(r.netRev)}</td>
+    <td>${fmt(r.varCost)}</td>
+    <td>${fmt(r.grossProfit)}</td>
+    <td><span class="badge ${badgeClass(r.grossMargin)}">${pct(r.grossMargin)}</span></td>
+  </tr>`;
+});
+const totGP = base.reduce((s,r)=>s+r.grossProfit,0);
+tableHTML += `<tr style="font-weight:500; border-top: 1px solid #ccc; background:#f9f9f7;">
+  <td>Итого</td><td></td><td></td><td>${fmtM(fin.totalRev)}</td><td></td>
+  <td>${fmtM(totGP)}</td><td><span class="badge ${badgeClass(totGP/fin.totalRev)}">${pct(totGP/fin.totalRev)}</span></td>
+</tr></tbody>`;
+document.getElementById('pl-table').innerHTML = tableHTML;
+
+// === P&L CHARTS ===
+new Chart(document.getElementById('marginChart'), {
+  type: 'bar',
+  data: {
+    labels: base.map(r => 'Страна ' + r.name),
+    datasets: [
+      { label: 'Валовая прибыль ($)', data: base.map(r => Math.round(r.grossProfit)), backgroundColor: '#1D9E75', yAxisID: 'y' },
+      { label: 'Маржа (%)', data: base.map(r => parseFloat((r.grossMargin*100).toFixed(1))), backgroundColor: '#378ADD', type: 'line', yAxisID: 'y2', tension: 0.3 }
+    ]
+  },
+  options: { responsive: true, maintainAspectRatio: false,
+    plugins: { legend: { display: true, position: 'top', labels: { font: { size: 12 }, boxWidth: 10 } } },
+    scales: { y: { title: { display: true, text: 'Прибыль ($)', font: { size: 11 } } }, y2: { position: 'right', title: { display: true, text: 'Маржа (%)', font: { size: 11 } }, grid: { drawOnChartArea: false } } } }
+});
+
+new Chart(document.getElementById('revenueChart'), {
+  type: 'bar',
+  data: {
+    labels: base.map(r => 'Страна ' + r.name),
+    datasets: [
+      { label: 'Чистый доход', data: base.map(r => Math.round(r.netRev)), backgroundColor: '#B5D4F4' },
+      { label: 'Перем. расходы', data: base.map(r => Math.round(r.varCost)), backgroundColor: '#F0997B' }
+    ]
+  },
+  options: { responsive: true, maintainAspectRatio: false,
+    plugins: { legend: { display: true, position: 'top', labels: { font: { size: 12 }, boxWidth: 10 } } },
+    scales: { y: { ticks: { callback: v => '$' + (v/1000).toFixed(0) + 'K' } } } }
+});
+
+// === CASH FLOW ===
+const dailySpend = base.reduce((s,r) => s + r.clients * r.opex, 0) / 30;
+const monthlyRev = fin.totalRev;
+const reserve = 800000;
+
+function buildCF(multiplier) {
+  const spend = dailySpend * multiplier;
+  const incoming30 = monthlyRev * 0.7 * multiplier / 30;
+  const incoming40 = monthlyRev * 0.3 * multiplier / 40;
+  let balance = reserve;
+  const balances = [], labels = [];
+  for (let d = 1; d <= 60; d++) {
+    balance -= spend;
+    if (d > 30) balance += incoming30;
+    if (d > 40) balance += incoming40;
+    balances.push(Math.round(balance));
+    labels.push('Д' + d);
+  }
+  return { balances, labels };
+}
+
+const cfBase = buildCF(1.0);
+const cfGrowth = buildCF(1.3);
+const gapDay = cfBase.balances.findIndex(b => b < 0);
+const gapDay30 = cfGrowth.balances.findIndex(b => b < 0);
+const minBalance = Math.min(...cfBase.balances);
+const minBalanceGrowth = Math.min(...cfGrowth.balances);
+const requiredReserve = reserve + Math.abs(minBalance);
+const requiredReserveGrowth = reserve + Math.abs(minBalanceGrowth);
+
+document.getElementById('cf-alert').innerHTML = gapDay >= 0
+  ? `<strong>Кассовый разрыв: день ${gapDay + 1}</strong> — баланс уходит в минус. При росте +30% разрыв наступает на день ${gapDay30 >= 0 ? gapDay30 + 1 : 'не возникает'}.`
+  : `<strong>Кассового разрыва нет</strong> при текущем резерве $800K. При росте +30% минимальный баланс: ${fmtM(minBalanceGrowth)}.`;
+
+document.getElementById('cf-metrics').innerHTML = `
+  <div class="metric"><div class="metric-label">Кассовый разрыв (база)</div><div class="metric-value" style="color:#A32D2D;">День ${gapDay + 1}</div><div class="metric-sub">баланс уходит в минус</div></div>
+  <div class="metric"><div class="metric-label">Нужный резерв (база)</div><div class="metric-value">${fmtM(requiredReserve)}</div><div class="metric-sub">для покрытия разрыва</div></div>
+  <div class="metric"><div class="metric-label">Кассовый разрыв (+30%)</div><div class="metric-value" style="color:#A32D2D;">День ${gapDay30 + 1}</div><div class="metric-sub">наступает раньше</div></div>
+  <div class="metric"><div class="metric-label">Нужный резерв (+30%)</div><div class="metric-value" style="color:#854F0B;">${fmtM(requiredReserveGrowth)}</div><div class="metric-sub">при росте объёма</div></div>
+`;
+
+new Chart(document.getElementById('cfGrowthChart'), {
+  type: 'line',
+  data: {
+    labels: cfBase.labels,
+    datasets: [
+      { label: 'База', data: cfBase.balances, borderColor: '#378ADD', tension: 0.3, pointRadius: 0 },
+      { label: '+30% рост', data: cfGrowth.balances, borderColor: '#D85A30', borderDash: [5,3], tension: 0.3, pointRadius: 0 }
+    ]
+  },
+  options: { responsive: true, maintainAspectRatio: false,
+    plugins: { legend: { display: true, position: 'top', labels: { font: { size: 12 }, boxWidth: 10 } } },
+    scales: { y: { ticks: { callback: v => '$' + Math.round(v/1000) + 'K' } }, x: { ticks: { autoSkip: true, maxTicksLimit: 12 } } } }
+});
+
+new Chart(document.getElementById('cfChart'), {
+  type: 'line',
+  data: {
+    labels: cfBase.labels,
+    datasets: [
+      { label: 'Баланс ($)', data: cfBase.balances, borderColor: '#1D9E75', backgroundColor: 'rgba(29,158,117,0.08)', fill: true, tension: 0.3, pointRadius: 0 },
+      { label: 'Нулевой уровень', data: new Array(60).fill(0), borderColor: '#E24B4A', borderDash: [4,3], pointRadius: 0 }
+    ]
+  },
+  options: { responsive: true, maintainAspectRatio: false,
+    plugins: { legend: { display: true, position: 'top', labels: { font: { size: 12 }, boxWidth: 10 } } },
+    scales: { y: { ticks: { callback: v => '$' + Math.round(v/1000) + 'K' } }, x: { ticks: { autoSkip: true, maxTicksLimit: 12 } } } }
+});
+
+// === SCENARIOS ===
+function calcScenario(unconfDelta, opexMult, revMult) {
+  const sc = countries.map(c => {
+    const adj = { ...c, unconf: Math.min(c.unconf + unconfDelta, 0.99), opex: c.opex * opexMult, rev: c.rev * revMult };
+    return calcCountry(adj);
+  });
+  return calcEBITDA(sc);
+}
+
+const sc1 = calcScenario(0.05, 1.0, 1.0);
+const sc2 = calcScenario(0.0, 1.10, 1.0);
+const sc3 = calcScenario(0.0, 1.0, 0.93);
+
+const scRows = [
+  { name: 'База',                     f: fin, unconfD: '—',        opexM: '—',        revM: '—' },
+  { name: 'Неподтверждённые +5 п.п.', f: sc1, unconfD: '+5 п.п.',  opexM: 'без изм.', revM: 'без изм.' },
+  { name: 'Opex +10%',                f: sc2, unconfD: 'без изм.', opexM: '+10%',     revM: 'без изм.' },
+  { name: 'Доход −7%',                f: sc3, unconfD: 'без изм.', opexM: 'без изм.', revM: '−7%' },
+];
+
+let st = `<thead><tr>
+  <th>Сценарий</th>
+  <th>Неподтв.</th>
+  <th>Opex</th>
+  <th>Доход/кл.</th>
+  <th>Чистый доход</th>
+  <th>Вал. прибыль</th>
+  <th>EBITDA</th>
+  <th>Изменение</th>
+  <th>Маржа EBITDA</th>
+</tr></thead><tbody>`;
+
+scRows.forEach((r, i) => {
+  const delta = r.f.ebitda - fin.ebitda;
+  const isBase = i === 0;
+  const eClass = r.f.ebitda >= 0 ? 'positive' : 'negative';
+  const dClass = delta >= 0 ? 'positive' : 'negative';
+  st += `<tr>
+    <td><strong>${r.name}</strong></td>
+    <td style="color:#666;">${r.unconfD}</td>
+    <td style="color:#666;">${r.opexM}</td>
+    <td style="color:#666;">${r.revM}</td>
+    <td>${fmtM(r.f.totalRev)}</td>
+    <td>${fmtM(r.f.totalGross)}</td>
+    <td class="${eClass}">${fmtM(r.f.ebitda)}</td>
+    <td class="${isBase ? '' : dClass}">${isBase ? '—' : fmtM(delta)}</td>
+    <td><span class="badge ${r.f.margin >= 0.05 ? 'badge-green' : r.f.margin >= 0 ? 'badge-amber' : 'badge-red'}">${pct(r.f.margin)}</span></td>
+  </tr>`;
+});
+st += '</tbody>';
+document.getElementById('sc-main-table').innerHTML = st;
+
+// === TAB SWITCH ===
+function switchTab(id) {
+  document.querySelectorAll('.tab').forEach((t, i) => {
+    const ids = ['pl','cf','scenario'];
+    t.classList.toggle('active', ids[i] === id);
+  });
+  document.querySelectorAll('.panel').forEach(p => p.classList.remove('active'));
+  document.getElementById(id).classList.add('active');
+}
+</script>
+</body>
+</html>
