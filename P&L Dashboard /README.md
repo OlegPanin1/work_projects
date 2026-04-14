@@ -1,5 +1,8 @@
 # 📊 Performance Marketing — Financial Dashboard
 
+<img width="1909" height="581" alt="image" src="https://github.com/user-attachments/assets/b9760bfa-30b3-46d5-b8b2-11ef911df393" />
+
+
 > Финансовая модель для performance-маркетинговой компании: P&L по странам, Cash-Flow анализ и сценарное моделирование рисков.
 
 ---
